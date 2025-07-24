@@ -80,7 +80,6 @@ def check_new_tenders():
 
             message = (
                 f"🔔 *Виявлена релевантна закупівля STІHL-типу!*"
-"
                 f"🆔 ID: `{tender_id}`\n"
                 f"📦 Товари: {items_info}\n"
                 f"💰 Очікувана вартість: {expected_value} {currency}\n"
