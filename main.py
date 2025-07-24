@@ -1,4 +1,4 @@
-﻿import requests
+import requests
 import time
 import datetime
 import telegram
@@ -15,7 +15,7 @@ bot = telegram.Bot(token=TELEGRAM_TOKEN)
 def search_prozorro():
     url = "https://public.api.openprocurement.org/api/2.5/tenders"
     params = {
-        "offset": datetime.datetime.now(datetime.UTC).isoformat(),
+        "offset": datetime.datetime.utcnow().isoformat(),
         "limit": 100,
         "descending": "1",
         "mode": "test.exclusion"  # щоб виключити тестові
