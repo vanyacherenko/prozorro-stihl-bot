@@ -1,99 +1,68 @@
 ﻿import requests
 import time
+import datetime
+import telegram
 
-BOT_TOKEN = "8047019586:AAEJiYwmR-jlP5WtPHz440nrP7Df-NY31mg"
+# ======== Налаштування =========
+KEYWORDS = ["stihl", "штиль", "ms 361", "ms 362", "ms 461", "ms 462", "ms 661", "ms 500"]
+REGION = "Чернігівська область"
+CHECK_INTERVAL = 1  # перевіряти кожні 1 хвилин
+TELEGRAM_TOKEN = "8047019586:AAEJiYwmR-jlP5WtPHz440nrP7Df-NY31mg"
 CHAT_ID = "1971727077"
 
-KEYWORDS = [
-    "мотокоса", "бензопила", "ланцюгова пила", "газонокосарка", "тример", "повітродувка",
-    "кущоріз", "висоторіз", "обприскувач", "акумуляторна техніка", "електропила",
-    "двигун внутрішнього згоряння", "двотактний двигун", "садова техніка"
-]
-REGION_FILTER = "Чернігівська"
-PROCUREMENT_METHODS = ["aboveThresholdUA", "belowThreshold"]  # Відкриті торги та спрощена
+bot = telegram.Bot(token=TELEGRAM_TOKEN)
 
-BASE_URL = "https://public.api.openprocurement.org/api/2.5/tenders"
-SEEN_IDS = set()
-
-
-def send_telegram_message(text):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": CHAT_ID,
-        "text": text,
-        "parse_mode": "Markdown",
-        "disable_web_page_preview": True
+def search_prozorro():
+    url = "https://public.api.openprocurement.org/api/2.5/tenders"
+    params = {
+        "offset": datetime.datetime.utcnow().isoformat(),
+        "limit": 100,
+        "descending": "1",
+        "mode": "test.exclusion"  # щоб виключити тестові
     }
-    requests.post(url, data=payload)
+    response = requests.get(url, params=params)
+    if response.status_code != 200:
+        print("Помилка запиту до Prozorro")
+        return []
+    return response.json().get("data", [])
 
+def is_relevant(tender):
+    title = tender.get("title", "").lower()
+    description = tender.get("description", "").lower()
+    region = tender.get("procuringEntity", {}).get("address", {}).get("region", "")
+    combined_text = title + description
+    return (
+        any(keyword in combined_text for keyword in KEYWORDS) and
+        REGION.lower() in region.lower()
+    )
 
-def check_new_tenders():
+def send_message(text):
     try:
-        response = requests.get(f"{BASE_URL}?limit=20")
-        tenders = response.json()["data"]
-
-        for item in tenders:
-            tender_id = item["id"]
-            if tender_id in SEEN_IDS:
-                continue
-            SEEN_IDS.add(tender_id)
-
-            # Завантаження повної інформації про тендер
-            tender_url = f"{BASE_URL}/{tender_id}"
-            tender_data = requests.get(tender_url).json()["data"]
-
-            # Фільтр за регіоном
-            region = tender_data.get("procuringEntity", {}).get("address", {}).get("region", "")
-            if REGION_FILTER.lower() not in region.lower():
-                continue
-
-            # Фільтр за типом закупівлі
-            procurement_method_type = tender_data.get("procurementMethodType", "")
-            if procurement_method_type not in PROCUREMENT_METHODS:
-                continue
-
-            title = tender_data.get("title", "").lower()
-            description = tender_data.get("description", "").lower()
-            items = tender_data.get("items", [])
-
-            # Аналіз найменувань і тех. характеристик
-            matches = []
-            for item in items:
-                name = item.get("description", "").lower()
-                if any(kw in name for kw in KEYWORDS):
-                    matches.append(item)
-
-            if not matches:
-                continue
-
-            # Формування повідомлення
-            tender_link = f"https://prozorro.gov.ua/tender/{tender_id}"
-            customer = tender_data.get("procuringEntity", {}).get("name", "Невідомо")
-            expected_value = tender_data.get("value", {}).get("amount", 0)
-            currency = tender_data.get("value", {}).get("currency", "UAH")
-
-            items_info = ""
-            for match in matches:
-                price = match.get("value", {}).get("amount", "Не вказано")
-                name = match.get("description", "Без опису")
-                items_info += f"\n- *{name}*, 💸 {price} {currency}"
-
-            message = (
-                f"🔔 *Виявлена релевантна закупівля STІHL-типу!*"
-                f"🆔 ID: `{tender_id}`\n"
-                f"📦 Товари: {items_info}\n"
-                f"💰 Очікувана вартість: {expected_value} {currency}\n"
-                f"🏢 Замовник: {customer}\n"
-                f"🔗 [Переглянути на Prozorro]({tender_link})"
-            )
-            send_telegram_message(message)
-
+        bot.send_message(chat_id=CHAT_ID, text=text, parse_mode=telegram.constants.ParseMode.MARKDOWN)
     except Exception as e:
-        print(f"Помилка: {e}")
+        print("Помилка надсилання повідомлення:", e)
 
+def format_message(tender):
+    return (
+        f"🔔 *Виявлена релевантна закупівля STІHL-типу!*\n"
+        f"📌 Назва: {tender.get('title', 'Без назви')}\n"
+        f"🏢 Замовник: {tender.get('procuringEntity', {}).get('name', 'Невідомо')}\n"
+        f"🌍 Область: {tender.get('procuringEntity', {}).get('address', {}).get('region', 'Невідомо')}\n"
+        f"🔗 https://prozorro.gov.ua/tender/{tender.get('id')}"
+    )
 
-if __name__ == "__main__":
-    print("📡 Запуск моніторингу тендерів STІHL...")
-    while True:
-        check_new_tenders()
-        time.sleep(1)  # кожні 1 секунд
+seen_ids = set()
+
+while True:
+    try:
+        tenders = search_prozorro()
+        for tender in tenders:
+            if tender["id"] in seen_ids:
+                continue
+            if is_relevant(tender):
+                msg = format_message(tender)
+                send_message(msg)
+            seen_ids.add(tender["id"])
+    except Exception as ex:
+        print("Помилка в головному циклі:", ex)
+    time.sleep(CHECK_INTERVAL)
