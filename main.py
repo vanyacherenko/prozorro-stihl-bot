@@ -4,7 +4,37 @@ import datetime
 import telegram
 
 # ======== Налаштування =========
-KEYWORDS = ["stihl", "штиль", "ms 361", "ms 362", "ms 461", "ms 462", "ms 661", "ms 500"]
+KEYWORDS = # Загальні назви бренду
+    "stihl", "штиль", "штиль україна",
+    # Мотопили (бензопили)
+    "бензопила", "мотопила", "chainsaw",
+    "ms 170", "ms 180", "ms 211", "ms 230", "ms 250", "ms 260",
+    "ms 261", "ms 271", "ms 290", "ms 311", "ms 361", "ms 362",
+    "ms 391", "ms 400", "ms 441", "ms 461", "ms 462", "ms 500",
+    "ms 500i", "ms 661", "ms 880",
+    # Акумуляторні пили
+    "msa 120", "msa 140", "msa 160", "msa 200", "msa 220",
+    # Коси, мотокоси, тримери
+    "мотокоса", "коса", "trimmer", "тример",
+    "fs 38", "fs 55", "fs 70", "fs 94", "fs 120", "fs 131",
+    "fs 250", "fs 260", "fs 360", "fs 410", "fs 460", "fs 490",
+    # Кущорізи, ножиці
+    "кущоріз", "кущорізи", "hs 45", "hs 56", "hs 82", "hs 87",
+    # Висоторізи
+    "висоторіз", "ht 75", "ht 101", "ht 131",
+    # Повітродувки, пилососи
+    "повітродувка", "повітродув", "пилосос",
+    "br 200", "br 350", "br 430", "br 600", "br 700", "br 800",
+    # Подрібнювачі
+    "садовий подрібнювач", "подрібнювач гілок", "gh 370", "gh 460",
+    # Мийки високого тиску
+    "мийка високого тиску", "мийка", "reh 120", "reh 160",
+    # Мотобури
+    "мотобур", "bt 121", "bt 131",
+    # Генератори
+    "генератор stihl",
+    # Комплектуючі
+    "ланцюг", "шина", "масло stihl", "запчастини stihl", "стартер", "фільтр повітряний", "свічка запалювання"]
 REGION = "Чернігівська область"
 CHECK_INTERVAL = 1  # перевіряти кожні 1 хвилин
 TELEGRAM_TOKEN = "8047019586:AAEJiYwmR-jlP5WtPHz440nrP7Df-NY31mg"
@@ -15,7 +45,7 @@ bot = telegram.Bot(token=TELEGRAM_TOKEN)
 def search_prozorro():
     url = "https://public.api.openprocurement.org/api/2.5/tenders"
     params = {
-        "offset": datetime.datetime.utcnow().isoformat(),
+        "offset": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         "limit": 100,
         "descending": "1",
         "mode": "test.exclusion"  # щоб виключити тестові
@@ -29,12 +59,12 @@ def search_prozorro():
 def is_relevant(tender):
     title = tender.get("title", "").lower()
     description = tender.get("description", "").lower()
-    region = tender.get("procuringEntity", {}).get("address", {}).get("region", "")
+    # region = tender.get("procuringEntity", {}).get("address", {}).get("region", "")
     combined_text = title + description
-    return (
-        any(keyword in combined_text for keyword in KEYWORDS) and
-        REGION.lower() in region.lower()
-    )
+    # return (
+    #    any(keyword in combined_text for keyword in KEYWORDS) and
+    #    REGION.lower() in region.lower()
+    #)
 
 def send_message(text):
     try:
