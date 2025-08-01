@@ -66,7 +66,7 @@ def is_relevant(tender):
     # region = tender.get("procuringEntity", {}).get("address", {}).get("region", "")
     # if REGION.lower() not in region.lower():
     #     return False
-return True
+        return True
 def send_message(text):
     try:
         bot.send_message(chat_id=CHAT_ID, text=text, parse_mode=telegram.constants.ParseMode.MARKDOWN)
