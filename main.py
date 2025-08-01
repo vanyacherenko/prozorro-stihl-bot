@@ -1,6 +1,6 @@
 import requests
 import time
-import datetime
+from datetime import datetime, timezone
 import telegram
 
 # ======== Налаштування =========
@@ -35,8 +35,8 @@ KEYWORDS = [
     "генератор stihl",
     # Комплектуючі
     "ланцюг", "шина", "масло stihl", "запчастини stihl", "стартер", "фільтр повітряний", "свічка запалювання"]
-REGION = "Чернігівська область"
-CHECK_INTERVAL = 1  # перевіряти кожні 1 хвилин
+# REGION = "Чернігівська область"
+CHECK_INTERVAL = 5  # перевіряти кожні 5 c
 TELEGRAM_TOKEN = "8047019586:AAEJiYwmR-jlP5WtPHz440nrP7Df-NY31mg"
 CHAT_ID = "1971727077"
 
@@ -45,8 +45,7 @@ bot = telegram.Bot(token=TELEGRAM_TOKEN)
 def search_prozorro():
     url = "https://public.api.openprocurement.org/api/2.5/tenders"
     params = {
-        from datetime import datetime, timezone
-        "offset": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "offset": datetime.now(timezone.utc).isoformat(),
         "limit": 100,
         "descending": "1",
         "mode": "test.exclusion"  # щоб виключити тестові
@@ -60,13 +59,14 @@ def search_prozorro():
 def is_relevant(tender):
     title = tender.get("title", "").lower()
     description = tender.get("description", "").lower()
+    combined_text = title + " " + description
+    if not any(keyword in combined_text for keyword in KEYWORDS):
+        return False
+    # Якщо хочеш перевірку області, розкоментуй цей блок:
     # region = tender.get("procuringEntity", {}).get("address", {}).get("region", "")
-    combined_text = title + description
-    # return (
-    #    any(keyword in combined_text for keyword in KEYWORDS) and
-    #    REGION.lower() in region.lower()
-    #)
-
+    # if REGION.lower() not in region.lower():
+    #     return False
+return True
 def send_message(text):
     try:
         bot.send_message(chat_id=CHAT_ID, text=text, parse_mode=telegram.constants.ParseMode.MARKDOWN)
