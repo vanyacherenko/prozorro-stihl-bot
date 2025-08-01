@@ -37,7 +37,7 @@ KEYWORDS = [
     "ланцюг", "шина", "масло stihl", "запчастини stihl", "стартер", "фільтр повітряний", "свічка запалювання"]
 # REGION = "Чернігівська область"
 CHECK_INTERVAL = 5  # перевіряти кожні 5 c
-TELEGRAM_TOKEN = "8047019586:AAEJiYwmR-jlP5WtPHz440nrP7Df-NY31mg"
+TELEGRAM_TOKEN = "8047019586:AAEhziintMV5wDI2JOSPmPf76uuAhGGFbBA"
 CHAT_ID = "1971727077"
 
 bot = telegram.Bot(token=TELEGRAM_TOKEN)
