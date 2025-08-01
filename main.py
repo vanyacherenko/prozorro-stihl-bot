@@ -45,6 +45,7 @@ bot = telegram.Bot(token=TELEGRAM_TOKEN)
 def search_prozorro():
     url = "https://public.api.openprocurement.org/api/2.5/tenders"
     params = {
+        from datetime import datetime, timezone
         "offset": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         "limit": 100,
         "descending": "1",
