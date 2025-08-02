@@ -86,6 +86,7 @@ seen_ids = set()
 
 while True:
     try:
+        print("Перевірка закупівель...") 
         tenders = search_prozorro()
         for tender in tenders:
             if tender["id"] in seen_ids:
@@ -97,7 +98,8 @@ while True:
     except Exception as ex:
         print("Помилка в головному циклі:", ex)
     time.sleep(CHECK_INTERVAL)
-print(f"Отримано тендер: {tender.get('title')}")
+
+
 
 
 
