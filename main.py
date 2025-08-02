@@ -97,6 +97,8 @@ while True:
     except Exception as ex:
         print("Помилка в головному циклі:", ex)
     time.sleep(CHECK_INTERVAL)
+print(f"Отримано тендер: {tender.get('title')}")
+
 
 
 
