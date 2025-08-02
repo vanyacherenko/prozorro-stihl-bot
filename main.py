@@ -46,7 +46,7 @@ def search_prozorro():
     url = "https://public.api.openprocurement.org/api/2.5/tenders"
     params = {
         "offset":  "2025-06-01T00:00:00Z" #datetime.now(timezone.utc).isoformat(),
-        "limit": 100,
+        #"limit": 100,
         "descending": "1",
         "mode": "test.exclusion"  # щоб виключити тестові
     }
@@ -97,5 +97,6 @@ while True:
     except Exception as ex:
         print("Помилка в головному циклі:", ex)
     time.sleep(CHECK_INTERVAL)
+
 
 
