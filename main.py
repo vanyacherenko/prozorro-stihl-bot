@@ -37,7 +37,7 @@ KEYWORDS = [
     "ланцюг", "шина", "масло stihl", "запчастини stihl", "стартер", "фільтр повітряний", "свічка запалювання"]
 # REGION = "Чернігівська область"
 CHECK_INTERVAL = 5  # перевіряти кожні 5 c
-TELEGRAM_TOKEN = "8047019586:AAEhziintMV5wDI2JOSPmPf76uuAhGGFbBA"
+TELEGRAM_TOKEN = "7596129263:AAGPhGmxG7d1ECKAd7SMu8HlBQBboGhCO4M"
 CHAT_ID = "1971727077"
 
 bot = telegram.Bot(token=TELEGRAM_TOKEN)
@@ -98,6 +98,7 @@ while True:
     except Exception as ex:
         print("Помилка в головному циклі:", ex)
     time.sleep(CHECK_INTERVAL)
+
 
 
 
