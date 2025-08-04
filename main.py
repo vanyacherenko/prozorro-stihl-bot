@@ -45,7 +45,7 @@ bot = telegram.Bot(token=TELEGRAM_TOKEN)
 def search_prozorro():
     url = "https://public.api.openprocurement.org/api/2.5/tenders"
     params = {
-        "offset":  "2025-07-01T00:00:00Z", #datetime.now(timezone.utc).isoformat(),
+        "offset":  "2025-07-08T00:00:00Z", #datetime.now(timezone.utc).isoformat(),
         "limit": 1000,
         "descending": "1",
         "mode": "test.exclusion"  # щоб виключити тестові
@@ -98,6 +98,7 @@ while True:
     except Exception as ex:
         print("Помилка в головному циклі:", ex)
     time.sleep(CHECK_INTERVAL)
+
 
 
 
