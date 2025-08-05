@@ -4,19 +4,22 @@ import os
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 
-# 🔐 Завантаження токенів із .env
+# Завантаження змінних з .env
 load_dotenv()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
 
-# 🔁 Інтервали
-CHECK_INTERVAL = 5
-STATUS_INTERVAL = 3600
+# 🧑‍💻 Список ID користувачів, яким надсилаємо повідомлення (вручну додаєш тут)
+CHAT_IDS = [
+    "1971727077",  # ← твоє
+    # "111222333",  # ← додаєш нових сюди
+    # "444555666",  # ← і ще
+]
 
-# 🔍 Регіон для фільтрації
+CHECK_INTERVAL = 5        # Перевірка кожні 5 сек
+STATUS_INTERVAL = 3600    # Раз на годину надсилати "Програма працює"
 TARGET_REGION = "чернігівська область"
 
-# 🔑 Ключові слова для пошуку
+# Ключові слова
 KEYWORDS = [
     "stihl", "штиль", "штиль україна", "бензопила", "мотопила", "chainsaw",
     "ms 170", "ms 180", "ms 211", "ms 230", "ms 250", "ms 260", "ms 261",
@@ -33,24 +36,22 @@ KEYWORDS = [
     "стартер", "фільтр", "свічка"
 ]
 
-# 🧠 Пам'ять оброблених тендерів
 seen_ids = set()
 last_status_time = time.monotonic()
 
-# 📤 Надсилання повідомлення в Telegram
 def send_message(text):
-    try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        data = {"chat_id": CHAT_ID, "text": text}
-        response = requests.post(url, data=data)
-        if response.status_code != 200:
-            print("❌ Помилка надсилання:", response.text)
-        else:
-            print("✅ Надіслано:", text[:50])
-    except Exception as e:
-        print("❌ Виняток надсилання:", e)
+    for chat_id in CHAT_IDS:
+        try:
+            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+            data = {"chat_id": chat_id, "text": text}
+            response = requests.post(url, data=data)
+            if response.status_code != 200:
+                print(f"❌ Не надіслано {chat_id}:", response.text)
+            else:
+                print(f"✅ Надіслано {chat_id}: {text[:50]}")
+        except Exception as e:
+            print(f"❌ Помилка {chat_id}:", e)
 
-# 🌐 Отримання тендерів з Prozorro
 def search_prozorro():
     url = "https://public.api.openprocurement.org/api/2.5/tenders"
     params = {
@@ -66,24 +67,15 @@ def search_prozorro():
             return []
         return response.json().get("data", [])
     except Exception as e:
-        print("❌ Помилка запиту:", e)
+        print("❌ Помилка при запиті:", e)
         return []
 
-# 🕵️‍♂️ Перевірка релевантності тендеру
 def is_relevant(tender):
-    # 1. Перевірка тексту
     text = (tender.get("title", "") + " " + tender.get("description", "")).lower()
-    if not any(keyword in text for keyword in KEYWORDS):
-        return False
-
-    # 2. Перевірка регіону
     region = tender.get("procuringEntity", {}).get("address", {}).get("region", "").lower()
-    if TARGET_REGION not in region:
-        return False
 
-    return True
+    return any(keyword in text for keyword in KEYWORDS) and TARGET_REGION in region
 
-# 🧾 Формування тексту повідомлення
 def format_message(tender):
     return (
         f"🔔 Виявлена закупівля STІHL-типу!\n"
@@ -93,21 +85,19 @@ def format_message(tender):
         f"🔗 https://prozorro.gov.ua/tender/{tender.get('id')}"
     )
 
-# 🚀 Основний цикл
 def main():
     global last_status_time
     while True:
         try:
             now = time.monotonic()
 
-            # Надсилаємо "програма працює" раз на годину
+            # Надсилати повідомлення раз на годину
             if now - last_status_time > STATUS_INTERVAL:
                 send_message("✅ Програма працює — " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 last_status_time = now
 
-            print("🔎 Перевірка тендерів...")
+            print("🔍 Перевірка тендерів...")
             tenders = search_prozorro()
-
             for tender in tenders:
                 tid = tender.get("id")
                 if tid and tid not in seen_ids:
@@ -122,7 +112,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
 
