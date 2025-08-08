@@ -11,7 +11,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 # 🧑‍💻 Список ID користувачів, яким надсилаємо повідомлення (вручну додаєш тут)
 CHAT_IDS = [
     "1971727077",  # ← твоє
-    # "",  # ← додаєш нових сюди
+    "7981671066",  # ← додаєш нових сюди
     # "444555666",  # ← і ще
 ]
 
@@ -74,8 +74,8 @@ def is_relevant(tender):
     text = (tender.get("title", "") + " " + tender.get("description", "")).lower()
     region = tender.get("procuringEntity", {}).get("address", {}).get("region", "").lower()
 
-    return any(keyword in text for keyword in KEYWORDS) and TARGET_REGION in region
-
+    #return any(keyword in text for keyword in KEYWORDS) and TARGET_REGION in region
+    return any(keyword in text for keyword in KEYWORDS)
 def format_message(tender):
     return (
         f"🔔 Виявлена закупівля STІHL-типу!\n"
@@ -112,6 +112,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
