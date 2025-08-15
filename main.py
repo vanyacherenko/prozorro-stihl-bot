@@ -10,13 +10,14 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 # Список ID користувачів
 CHAT_IDS = [
-    "1971727077",  # ← твоє
-    "7981671066",  # ← нові
+    "1971727077",
+    "7981671066",
 ]
 
-CHECK_INTERVAL = 3 # Перевірка кожні 30 сек
-STATUS_INTERVAL = 86400    # Раз на добу надсилати "Програма працює"
-TARGET_REGION = "чернігівська область"  # Регіон (можна використовувати, якщо потрібно)
+CHECK_INTERVAL = 15  # безпечний інтервал для Prozorro
+STATUS_INTERVAL = 86400
+TARGET_REGION = "чернігівська область"
+
 KEYWORDS = [
     "stihl", "штиль", "штиль україна", "бензопила", "мотопила", "chainsaw",
     "ms 170", "ms 180", "ms 211", "ms 230", "ms 250", "ms 260", "ms 261", "ms 271", "ms 290",
@@ -34,11 +35,11 @@ KEYWORDS = [
 
 seen_ids = set()
 last_status_time = time.monotonic()
-last_offset = None  # Для збереження позиції при отриманні нових тендерів
+last_offset = None
 
 
-# 🔹 Перетворення тендера в єдиний текст
 def tender_to_text(data):
+    """Рекурсивно перетворює структуру тендера у суцільний текст."""
     if isinstance(data, dict):
         return " ".join(tender_to_text(v) for v in data.values())
     elif isinstance(data, list):
@@ -48,8 +49,8 @@ def tender_to_text(data):
     return ""
 
 
-# 🔹 Відправка повідомлення в Telegram
 def send_message(text):
+    """Відправка повідомлення у Telegram."""
     for chat_id in CHAT_IDS:
         try:
             url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -63,8 +64,8 @@ def send_message(text):
             print(f"❌ Помилка {chat_id}:", e)
 
 
-# 🔹 Отримання тендерів з Prozorro
 def search_prozorro():
+    """Отримання списку останніх тендерів."""
     global last_offset
     url = "https://public.api.openprocurement.org/api/2.5/tenders"
     params = {"limit": 100, "descending": "1"}
@@ -77,23 +78,34 @@ def search_prozorro():
             return []
         json_data = response.json()
         last_offset = json_data.get("next_page", {}).get("offset", last_offset)
-        tenders = json_data.get("data", [])
-        print(f"📥 Отримано {len(tenders)} тендерів.")
-        return tenders
+        return json_data.get("data", [])
     except Exception as e:
         print("❌ Помилка при запиті:", e)
         return []
 
 
-# 🔹 Перевірка на відповідність ключовим словам у всіх полях
+def get_tender_details(tid):
+    """Отримання повної інформації про тендер."""
+    url = f"https://public.api.openprocurement.org/api/2.5/tenders/{tid}"
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code != 200:
+            return {}
+        return response.json().get("data", {})
+    except Exception as e:
+        print("❌ Помилка при отриманні деталей:", e)
+        return {}
+
+
 def is_relevant(tender):
+    """Перевірка на ключові слова та регіон."""
     full_text = tender_to_text(tender).lower()
-    return any(keyword in full_text for keyword in KEYWORDS)
+    #region = tender.get("procuringEntity", {}).get("address", {}).get("region", "").lower()
+    return any(keyword in full_text for keyword in KEYWORDS) 
 
 
-# 🔹 Формування повідомлення
-# 🔹 Формування повідомлення
 def format_message(tender):
+    """Формування повідомлення для Telegram."""
     return (
         f"🔔 Виявлена закупівля STІHL-типу!\n"
         f"📌 Назва: {tender.get('title', 'Без назви')}\n"
@@ -103,14 +115,12 @@ def format_message(tender):
         f"🔗 https://prozorro.gov.ua/tender/{tender.get('tenderID', tender.get('id'))}"
     )
 
-# 🔹 Головний цикл
+
 def main():
     global last_status_time
     while True:
         try:
             now = time.monotonic()
-
-            # Раз на добу надсилати повідомлення "програма працює"
             if now - last_status_time > STATUS_INTERVAL:
                 send_message("✅ Програма працює — " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 last_status_time = now
@@ -121,8 +131,9 @@ def main():
             for tender in tenders:
                 tid = tender.get("id")
                 if tid and tid not in seen_ids:
-                    if is_relevant(tender):
-                        send_message(format_message(tender))
+                    details = get_tender_details(tid)
+                    if details and is_relevant(details):
+                        send_message(format_message(details))
                     seen_ids.add(tid)
 
         except Exception as e:
