@@ -1,7 +1,7 @@
 import requests
 import time
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 # Завантаження змінних з .env
@@ -11,12 +11,13 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 # Список ID користувачів
 CHAT_IDS = [
     "1971727077",
-    #"7981671066",
+    # "7981671066",
 ]
 
-CHECK_INTERVAL = 15  # безпечний інтервал для Prozorro
-STATUS_INTERVAL = 86400
+CHECK_INTERVAL = 15       # сек. — інтервал перевірки Prozorro
+STATUS_INTERVAL = 86400   # раз на добу повідомлення про роботу
 TARGET_REGION = "чернігівська область"
+MAX_TENDER_AGE_HOURS = 1  # брати тільки тендери за останню годину
 
 KEYWORDS = [
     "stihl", "штиль", "штиль україна", "бензопила", "мотопила", "chainsaw",
@@ -100,8 +101,10 @@ def get_tender_details(tid):
 def is_relevant(tender):
     """Перевірка на ключові слова та регіон."""
     full_text = tender_to_text(tender).lower()
-    #region = tender.get("procuringEntity", {}).get("address", {}).get("region", "").lower()
-    return any(keyword in full_text for keyword in KEYWORDS) #and TARGET_REGION in region
+    return any(keyword in full_text for keyword in KEYWORDS)
+    # Можна додати фільтр по регіону:
+    # region = tender.get("procuringEntity", {}).get("address", {}).get("region", "").lower()
+    # return any(keyword in full_text for keyword in KEYWORDS) and TARGET_REGION in region
 
 
 def format_message(tender):
@@ -133,7 +136,19 @@ def main():
                 if tid and tid not in seen_ids:
                     details = get_tender_details(tid)
                     if details and is_relevant(details):
-                        send_message(format_message(details))
+                        try:
+                            tender_date = datetime.fromisoformat(details.get("dateModified"))
+                            # Якщо tender_date має tzinfo — переводимо now теж у UTC
+                            if tender_date.tzinfo is not None:
+                                now_utc = datetime.now(timezone.utc)
+                            else:
+                                now_utc = datetime.now()
+
+                            if (now_utc - tender_date).total_seconds() <= MAX_TENDER_AGE_HOURS * 3600:
+                                send_message(format_message(details))
+                        except Exception as date_err:
+                            print("⚠️ Помилка при обробці дати:", date_err)
+
                     seen_ids.add(tid)
 
         except Exception as e:
@@ -144,7 +159,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
 
