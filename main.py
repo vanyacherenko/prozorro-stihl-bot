@@ -69,8 +69,8 @@ def send_telegram_message(text):
 
 def fetch_new_tenders():
     """Отримання нових тендерів в реальному часі"""
-    url = "https://public.api.openprocurement.org/api/2.5/tenders?feed=changes&mode=real_time"
     try:
+        url = "https://public.api.openprocurement.org/api/2.5/tenders?feed=changes&mode=real_time"
         response = requests.get(url)
         if response.status_code == 200:
             return response.json().get("data", [])
@@ -85,8 +85,8 @@ def is_keyword_in_text(text):
 
 def process_tender(tender_id):
     """Обробка тендера"""
-    url = f"https://public.api.openprocurement.org/api/2.5/tenders/{tender_id}"
     try:
+        url = f"https://public.api.openprocurement.org/api/2.5/tenders/{tender_id}"
         response = requests.get(url)
         if response.status_code != 200:
             return
@@ -105,6 +105,8 @@ def process_tender(tender_id):
             if tender_id not in sent_tenders:
                 send_telegram_message(message)
                 sent_tenders.add(tender_id)
+    except Exception as e:
+        print(f"❌ Помилка обробки тендера {tender_id}: {e}")
 
 def main():
     print("🚀 Старт моніторингу нових тендерів STIHL...")
@@ -123,22 +125,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
