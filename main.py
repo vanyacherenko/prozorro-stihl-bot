@@ -84,8 +84,8 @@ def search_prozorro():
 
 # Перевірка на відповідність ключовим словам та регіону
 def is_relevant(tender):
-    text = (tender.get("title", "") + " " + tender.get("description", "")).lower()
-    region = tender.get("procuringEntity", {}).get("address", {}).get("region", "").lower()
+    # text = (tender.get("title", "") + " " + tender.get("description", "")).lower()
+    # region = tender.get("procuringEntity", {}).get("address", {}).get("region", "").lower()
     return any(keyword in text for keyword in KEYWORDS) and TARGET_REGION in region
 
 # Формування повідомлення
@@ -127,6 +127,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
