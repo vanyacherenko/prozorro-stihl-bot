@@ -1,13 +1,20 @@
 import requests
 import time
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 from dotenv import load_dotenv
 
 # Завантаження токена та чатів з .env
 load_dotenv()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_IDS = ["197172707"]  # ID користувачів
+CHAT_IDS = ["197172707"]
+
+# Перевірка токена на старті
+if not TELEGRAM_TOKEN:
+    print("❌ TELEGRAM_TOKEN не знайдено у .env!")
+    exit(1)
+else:
+    print(f"✅ .env завантажено, токен: {TELEGRAM_TOKEN[:5]}...")
 
 # Повний список ключових слів
 KEYWORDS = [
@@ -37,23 +44,23 @@ DK_CODES = [
     "39713432-6"
 ]
 
-# Список вже відправлених тендерів
-sent_tenders = set()
+sent_tenders = set()  # Тендери, що вже були надіслані
 
 def send_telegram_message(text):
-    """Відправка повідомлення у Telegram з паузою та захистом від лімітів"""
+    """Відправка повідомлення у Telegram з обробкою лімітів"""
     for chat_id in CHAT_IDS:
         while True:
             try:
                 url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
                 payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
                 response = requests.post(url, data=payload)
-
+                
                 if response.status_code == 429:
                     retry_after = response.json().get("parameters", {}).get("retry_after", 1)
                     print(f"⏳ Ліміт Telegram, чекаю {retry_after} сек...")
                     time.sleep(retry_after)
                     continue
+                print(f"✅ Повідомлення надіслано у Telegram ({chat_id})")
                 break
             except Exception as e:
                 print(f"❌ Помилка Telegram: {e}")
@@ -61,7 +68,7 @@ def send_telegram_message(text):
                 continue
 
 def fetch_new_tenders():
-    """Отримання нових тендерів з Prozorro в реальному часі"""
+    """Отримання нових тендерів в реальному часі"""
     url = "https://public.api.openprocurement.org/api/2.5/tenders?feed=changes&mode=real_time"
     try:
         response = requests.get(url)
@@ -77,7 +84,7 @@ def is_keyword_in_text(text):
     return any(keyword.lower() in text.lower() for keyword in KEYWORDS)
 
 def process_tender(tender_id):
-    """Обробка тендеру та перевірка по ключових словах або кодах ДК"""
+    """Обробка тендера"""
     url = f"https://public.api.openprocurement.org/api/2.5/tenders/{tender_id}"
     try:
         response = requests.get(url)
@@ -86,8 +93,6 @@ def process_tender(tender_id):
         tender = response.json().get("data", {})
         title = tender.get("title", "").lower()
         description = tender.get("description", "").lower()
-
-        # Перевірка кодів ДК
         cpv_codes = [item.get("classification", {}).get("id", "") for item in tender.get("items", [])]
 
         if is_keyword_in_text(title) or is_keyword_in_text(description) or any(cpv in DK_CODES for cpv in cpv_codes):
@@ -101,25 +106,24 @@ def process_tender(tender_id):
                 send_telegram_message(message)
                 sent_tenders.add(tender_id)
 
-    except Exception as e:
-        print(f"❌ Помилка обробки тендеру {tender_id}: {e}")
-
 def main():
     print("🚀 Старт моніторингу нових тендерів STIHL...")
     while True:
         try:
             tenders = fetch_new_tenders()
+            print(f"🔍 Перевірено {len(tenders)} нових тендерів ({datetime.now()})")
             for tender in tenders:
                 tender_id = tender.get("id")
                 if tender_id and tender_id not in sent_tenders:
                     process_tender(tender_id)
-            time.sleep(10)  # Перевірка кожні 10 секунд
+            time.sleep(15)  # перевірка кожні 15 секунд
         except Exception as e:
             print(f"❌ Помилка основного циклу: {e}")
-            time.sleep(10)
+            time.sleep(15)
 
 if __name__ == "__main__":
     main()
+
 
 
 
