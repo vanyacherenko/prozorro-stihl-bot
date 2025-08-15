@@ -8,18 +8,17 @@ from dotenv import load_dotenv
 load_dotenv()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
-# 🧑‍💻 Список ID користувачів, яким надсилаємо повідомлення (вручну додаєш тут)
+# Список ID користувачів, яким надсилаємо повідомлення
 CHAT_IDS = [
     "1971727077",  # ← твоє
     "7981671066",  # ← додаєш нових сюди
-    # "444555666",  # ← і ще
 ]
 
-CHECK_INTERVAL = 5        # Перевірка кожні 5 сек
+CHECK_INTERVAL = 30        # Перевірка кожні 30 сек
 STATUS_INTERVAL = 86400    # Раз на добу надсилати "Програма працює"
 TARGET_REGION = "чернігівська область"
 
-# Ключові слова
+# Ключові слова для пошуку
 KEYWORDS = [
     "stihl", "штиль", "штиль україна", "бензопила", "мотопила", "chainsaw",
     "ms 170", "ms 180", "ms 211", "ms 230", "ms 250", "ms 260", "ms 261",
@@ -38,7 +37,9 @@ KEYWORDS = [
 
 seen_ids = set()
 last_status_time = time.monotonic()
+last_offset = None  # Зберігаємо останній offset для безперервної роботи
 
+# Відправка повідомлення в Telegram
 def send_message(text):
     for chat_id in CHAT_IDS:
         try:
@@ -52,52 +53,66 @@ def send_message(text):
         except Exception as e:
             print(f"❌ Помилка {chat_id}:", e)
 
+# Пошук тендерів на Prozorro
 def search_prozorro():
+    global last_offset
     url = "https://public.api.openprocurement.org/api/2.5/tenders"
+
     params = {
-        "offset": datetime.now(timezone.utc).isoformat(),
-        "limit": 1000,
-        "descending": "1",
-        "mode": "test.exclusion"
+        "limit": 100,  # щоб не забивати сервер
+        "descending": "1"
     }
+    if last_offset:
+        params["offset"] = last_offset
+
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, timeout=10)
         if response.status_code != 200:
             print("❌ Запит не вдався:", response.status_code)
             return []
-        return response.json().get("data", [])
+
+        json_data = response.json()
+        last_offset = json_data.get("next_page", {}).get("offset", last_offset)
+        tenders = json_data.get("data", [])
+
+        print(f"📥 Отримано {len(tenders)} тендерів.")
+        return tenders
+
     except Exception as e:
         print("❌ Помилка при запиті:", e)
         return []
 
+# Перевірка на відповідність ключовим словам та регіону
 def is_relevant(tender):
     text = (tender.get("title", "") + " " + tender.get("description", "")).lower()
     region = tender.get("procuringEntity", {}).get("address", {}).get("region", "").lower()
+    return any(keyword in text for keyword in KEYWORDS) and TARGET_REGION in region
 
-    #return any(keyword in text for keyword in KEYWORDS) and TARGET_REGION in region
-    return any(keyword in text for keyword in KEYWORDS)
+# Формування повідомлення
 def format_message(tender):
     return (
         f"🔔 Виявлена закупівля STІHL-типу!\n"
         f"📌 Назва: {tender.get('title', 'Без назви')}\n"
         f"🏢 Замовник: {tender.get('procuringEntity', {}).get('name', 'Невідомо')}\n"
         f"🌍 Область: {tender.get('procuringEntity', {}).get('address', {}).get('region', 'Невідомо')}\n"
-        f"🔗 https://prozorro.gov.ua/tender/{tender.get('id')}"
+        f"🔗 https://prozorro.gov.ua/tender/{tender.get('tenderID', tender.get('id'))}"
     )
 
+# Головний цикл програми
 def main():
     global last_status_time
     while True:
         try:
             now = time.monotonic()
 
-            # Надсилати повідомлення раз на годину
+            # Раз на добу надсилати повідомлення, що програма працює
             if now - last_status_time > STATUS_INTERVAL:
                 send_message("✅ Програма працює — " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 last_status_time = now
 
             print("🔍 Перевірка тендерів...")
             tenders = search_prozorro()
+
             for tender in tenders:
                 tid = tender.get("id")
                 if tid and tid not in seen_ids:
@@ -112,6 +127,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
 
 
 
