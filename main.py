@@ -7,14 +7,22 @@ from dotenv import load_dotenv
 # Завантаження токена та чатів з .env
 load_dotenv()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_IDS = ["197172707"]  # ID користувачів, яким надсилати повідомлення
+CHAT_IDS = ["197172707"]  # ID користувачів
 
-# Ключові слова для пошуку у назві/описі
+# Повний список ключових слів
 KEYWORDS = [
-    "stihl", "штиль", "мотопила", "бензопила", "газонокосарка",
-    "мотокоса", "триммер", "кущоріз", "повітродувка", "пилосос",
-    "мотокультиватор", "садова техніка", "запасні частини stihl",
-    "ланцюг", "шина", "фільтр stihl", "олива stihl"
+    "stihl", "штиль", "штиль україна", "бензопила", "мотопила", "chainsaw",
+    "ms 170", "ms 180", "ms 211", "ms 230", "ms 250", "ms 260", "ms 261",
+    "ms 271", "ms 290", "ms 311", "ms 361", "ms 362", "ms 391", "ms 400",
+    "ms 441", "ms 461", "ms 462", "ms 500", "ms 500i", "ms 661", "ms 880",
+    "msa 120", "msa 140", "msa 160", "msa 200", "msa 220", "мотокоса", "коса",
+    "trimmer", "тример", "fs 38", "fs 55", "fs 70", "fs 94", "fs 120", "fs 131",
+    "fs 250", "fs 260", "fs 360", "fs 410", "fs 460", "fs 490", "кущоріз", "hs 45",
+    "hs 56", "hs 82", "hs 87", "висоторіз", "ht 75", "ht 101", "ht 131",
+    "повітродувка", "повітродув", "пилосос", "br 200", "br 350", "br 430",
+    "br 600", "br 700", "br 800", "подрібнювач", "gh 370", "gh 460", "мийка",
+    "reh 120", "reh 160", "мотобур", "bt 121", "bt 131", "генератор stihl",
+    "ланцюг", "шина", "масло stihl", "запчастини", "стартер", "фільтр", "свічка"
 ]
 
 # Розширений список кодів ДК
@@ -33,50 +41,71 @@ DK_CODES = [
 sent_tenders = set()
 
 def send_telegram_message(text):
-    """Відправка повідомлення у Telegram"""
+    """Відправка повідомлення у Telegram з паузою та захистом від лімітів"""
     for chat_id in CHAT_IDS:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
-        requests.post(url, data=payload)
+        while True:
+            try:
+                url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+                payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+                response = requests.post(url, data=payload)
+
+                if response.status_code == 429:
+                    retry_after = response.json().get("parameters", {}).get("retry_after", 1)
+                    print(f"⏳ Ліміт Telegram, чекаю {retry_after} сек...")
+                    time.sleep(retry_after)
+                    continue
+                break
+            except Exception as e:
+                print(f"❌ Помилка Telegram: {e}")
+                time.sleep(5)
+                continue
 
 def fetch_new_tenders():
-    """Отримання нових тендерів з Prozorro"""
+    """Отримання нових тендерів з Prozorro в реальному часі"""
     url = "https://public.api.openprocurement.org/api/2.5/tenders?feed=changes&mode=real_time"
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json().get("data", [])
-        return data
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json().get("data", [])
+    except Exception as e:
+        print(f"❌ Помилка завантаження тендерів: {e}")
     return []
 
-def process_tender(tender_id):
-    """Обробка тендеру та перевірка на ключові слова або код ДК"""
-    tender_url = f"https://public.api.openprocurement.org/api/2.5/tenders/{tender_id}"
-    response = requests.get(tender_url)
-    if response.status_code != 200:
-        return
-    
-    tender = response.json().get("data", {})
-    title = tender.get("title", "").lower()
-    description = tender.get("description", "").lower()
-    cpv_code = tender.get("items", [{}])[0].get("classification", {}).get("id", "")
+def is_keyword_in_text(text):
+    if not text:
+        return False
+    return any(keyword.lower() in text.lower() for keyword in KEYWORDS)
 
-    # Перевірка на ключові слова або код ДК
-    if any(keyword in title or keyword in description for keyword in KEYWORDS) or cpv_code in DK_CODES:
-        # Формуємо повідомлення
-        tender_link = f"https://prozorro.gov.ua/tender/{tender_id}"
-        message = f"🆕 <b>Новий тендер</b>\n\n" \
-                  f"📌 <b>{tender.get('title')}</b>\n" \
-                  f"📅 Дата: {tender.get('datePublished')}\n" \
-                  f"📑 Код ДК: {cpv_code}\n" \
-                  f"🔗 {tender_link}"
-        
-        # Надсилаємо тільки якщо не відправляли раніше
-        if tender_id not in sent_tenders:
-            send_telegram_message(message)
-            sent_tenders.add(tender_id)
+def process_tender(tender_id):
+    """Обробка тендеру та перевірка по ключових словах або кодах ДК"""
+    url = f"https://public.api.openprocurement.org/api/2.5/tenders/{tender_id}"
+    try:
+        response = requests.get(url)
+        if response.status_code != 200:
+            return
+        tender = response.json().get("data", {})
+        title = tender.get("title", "").lower()
+        description = tender.get("description", "").lower()
+
+        # Перевірка кодів ДК
+        cpv_codes = [item.get("classification", {}).get("id", "") for item in tender.get("items", [])]
+
+        if is_keyword_in_text(title) or is_keyword_in_text(description) or any(cpv in DK_CODES for cpv in cpv_codes):
+            tender_link = f"https://prozorro.gov.ua/tender/{tender_id}"
+            message = f"🆕 <b>Новий тендер</b>\n\n" \
+                      f"📌 <b>{tender.get('title')}</b>\n" \
+                      f"📅 Дата: {tender.get('datePublished')}\n" \
+                      f"📑 Коди ДК: {', '.join(cpv_codes)}\n" \
+                      f"🔗 {tender_link}"
+            if tender_id not in sent_tenders:
+                send_telegram_message(message)
+                sent_tenders.add(tender_id)
+
+    except Exception as e:
+        print(f"❌ Помилка обробки тендеру {tender_id}: {e}")
 
 def main():
-    """Основний цикл програми"""
+    print("🚀 Старт моніторингу нових тендерів STIHL...")
     while True:
         try:
             tenders = fetch_new_tenders()
@@ -84,9 +113,9 @@ def main():
                 tender_id = tender.get("id")
                 if tender_id and tender_id not in sent_tenders:
                     process_tender(tender_id)
-            time.sleep(60)  # Перевірка кожну хвилину
+            time.sleep(60)  # Перевірка щохвилини
         except Exception as e:
-            print(f"❌ Помилка: {e}")
+            print(f"❌ Помилка основного циклу: {e}")
             time.sleep(60)
 
 if __name__ == "__main__":
