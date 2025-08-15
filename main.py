@@ -113,13 +113,14 @@ def main():
                 tender_id = tender.get("id")
                 if tender_id and tender_id not in sent_tenders:
                     process_tender(tender_id)
-            time.sleep(60)  # Перевірка щохвилини
+            time.sleep(10)  # Перевірка кожні 10 секунд
         except Exception as e:
             print(f"❌ Помилка основного циклу: {e}")
-            time.sleep(60)
+            time.sleep(10)
 
 if __name__ == "__main__":
     main()
+
 
 
 
